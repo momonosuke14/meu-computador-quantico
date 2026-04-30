@@ -1,209 +1,144 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, ShieldAlert, Cpu, Bluetooth, Zap } from 'lucide-react';
 
 export default function QuantumMainframe() {
-  const [pulse, setPulse] = useState(1);
-  const [entropy, setEntropy] = useState(0.0024);
-  const [messages, setMessages] = useState([
-    { text: "SISTEMA OPERACIONAL ℜ INICIALIZADO. CHIP OFFLINE.", type: "bot" }
-  ]);
-  const [inputValue, setInputValue] = useState("");
-  const [isAbsorbing, setIsAbsorbing] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [sensorValue, setSensorValue] = useState(0);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [stats, setStats] = useState({
+    x: 0,
+    stability: 1.0,
+    fext: 0,
+    hadamard: 0,
+    status: "OFFLINE",
+    hardware: "DISCONNECTED"
+  });
 
-  // Efeito visual de pulsação e oscilação de entropia
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPulse(p => (p > 1.05 ? 1 : p + 0.002));
-      if(!isConnected) {
-        setEntropy(s => +(s + (Math.random() * 0.0004 - 0.0002)).toFixed(4));
-      }
-    }, 50);
-    return () => clearInterval(interval);
-  }, [isConnected]);
+    // Conectando ao nosso engine.py na porta 8765
+    const socket = new WebSocket('ws://localhost:8765');
 
-  // Rola o chat para baixo automaticamente
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      setStats(data);
+    };
 
-  // Função para conectar ao Arduino via Web Serial API
-  const connectHardware = async () => {
-    try {
-      // @ts-ignore
-      const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 9600 });
-      setIsConnected(true);
-      setMessages(prev => [...prev, { text: "LINK NEURAL ESTABELECIDO COM O CHIP ℜ.", type: "bot" }]);
+    socket.onclose = () => {
+      setStats(prev => ({ ...prev, status: "OFFLINE", hardware: "ERROR" }));
+    };
 
-      const reader = port.readable.getReader();
-      const decoder = new TextDecoder();
+    return () => socket.close();
+  }, []);
 
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const data = decoder.decode(value);
-        
-        if (data.includes("VALOR_SENSOR:")) {
-          const val = parseInt(data.split(":")[1]);
-          if (!isNaN(val)) {
-            setSensorValue(val);
-            setEntropy(+(val / 10000).toFixed(4));
-          }
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Erro ao acessar porta serial. Use Chrome ou Edge e verifique a permissão.");
-    }
-  };
-
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
-
-    setMessages(prev => [...prev, { text: inputValue, type: "user" }]);
-    setIsAbsorbing(true);
-    setInputValue("");
-    
-    setTimeout(() => {
-      setIsAbsorbing(false);
-      const response = isConnected 
-        ? `COMANDO PROCESSADO PELO CHIP. RESSONÂNCIA ATUAL: ${sensorValue}.` 
-        : "DADOS PROCESSADOS EM NUVEM (MODO SIMULAÇÃO - CHIP OFFLINE).";
-      setMessages(prev => [...prev, { text: response, type: "bot" }]);
-    }, 800);
-  };
+  const isCritical = stats.stability < 0.4;
 
   return (
-    <main className="min-h-screen bg-[#020202] text-white font-mono p-4 flex items-center justify-center overflow-hidden">
+    <main className="min-h-screen bg-black text-amber-500 p-8 font-mono selection:bg-amber-500 selection:text-black">
       
-      {/* FRAME DO MAINFRAME ESTILO TERMINAL INDUSTRIAL */}
-      <div className="relative w-full max-w-[1400px] h-[92vh] bg-[#050505] border-[16px] border-[#111] rounded-[50px] shadow-[0_0_100px_black] flex flex-col overflow-hidden border-t-[#222] border-l-[#1a1a1a]">
-        
-        {/* HEADER / BARRA DE STATUS */}
-        <div className="h-20 bg-[#0a0a0a] border-b border-white/10 flex items-center px-12 justify-between z-50 shadow-2xl">
-          <div className="flex items-center gap-6">
-            <div className={`w-4 h-4 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_15px_green]' : 'bg-red-600 animate-pulse shadow-[0_0_10px_red]'}`}></div>
-            <div className="flex flex-col">
-              <span className="text-[10px] tracking-[0.4em] font-black uppercase text-gray-500">Status do Link Neural</span>
-              <span className="text-[12px] text-cyan-400 font-bold tracking-widest">
-                {isConnected ? "SISTEMA_OPERACIONAL_R_ONLINE" : "AGUARDANDO_HARDWARE_EXTERNO"}
-              </span>
-            </div>
-          </div>
-
-          <button 
-            onClick={connectHardware}
-            className={`px-8 py-3 text-[11px] font-black tracking-[0.2em] border-2 transition-all duration-300 ${
-              isConnected 
-              ? 'border-green-500 text-green-500 bg-green-500/10' 
-              : 'border-cyan-500 text-cyan-500 hover:bg-cyan-500 hover:text-black hover:shadow-[0_0_25px_cyan]'
-            }`}
-          >
-            {isConnected ? "SINC_ATIVO ℜ" : "CONECTAR_CHIP_ℜ"}
-          </button>
+      {/* HEADER DO SISTEMA */}
+      <div className="max-w-6xl mx-auto flex justify-between items-center border-b border-amber-900/30 pb-6 mb-8">
+        <div>
+          <h1 className="text-4xl font-black tracking-tighter flex items-center gap-3">
+            OBJECTUM <span className="text-white bg-amber-600 px-2">𝓧</span>
+          </h1>
+          <p className="text-[10px] opacity-50 tracking-[0.3em] uppercase">Quantum Simulation v4.1 PilotOS Core</p>
         </div>
-
-        {/* ÁREA DE CONTEÚDO COM TEXTURA */}
-        <div className="flex-grow grid grid-cols-12 overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-repeat">
-          
-          {/* PAINEL ESQUERDO: TELEMETRIA */}
-          <div className="col-span-3 border-r border-white/5 p-8 flex flex-col gap-10 bg-black/60 backdrop-blur-sm">
-            <div>
-              <p className="text-[10px] text-gray-600 mb-2 uppercase tracking-[0.3em] font-bold">Entropia Local (S_D)</p>
-              <p className="text-5xl font-black text-yellow-500 drop-shadow-[0_0_10px_rgba(234,179,8,0.3)]">{entropy}</p>
-            </div>
-            
-            <div className="space-y-4">
-              <p className="text-[10px] text-gray-600 uppercase tracking-[0.3em] font-bold text-cyan-500">Ressonância do Campo</p>
-              <div className="h-3 w-full bg-gray-900 rounded-sm overflow-hidden border border-white/10">
-                <div className="h-full bg-cyan-500 shadow-[0_0_10px_cyan] transition-all duration-300" style={{ width: `${(sensorValue/1023)*100}%` }}></div>
-              </div>
-              <div className="flex justify-between text-[9px] text-cyan-900 uppercase font-black">
-                <span>0.000 uT</span>
-                <span>{sensorValue} raw</span>
-                <span>1.023 max</span>
-              </div>
-            </div>
+        
+        <div className="flex gap-6 text-right">
+          <div className="flex flex-col">
+            <span className="text-[10px] opacity-40 uppercase">Hardware Link</span>
+            <span className={`text-sm font-bold flex items-center gap-2 ${stats.hardware === 'EMULATED' ? 'text-blue-400' : 'text-green-500'}`}>
+              <Bluetooth size={14} /> {stats.hardware}
+            </span>
           </div>
-
-          {/* PAINEL CENTRAL: O NÚCLEO CALABI-YAU */}
-          <div className="col-span-6 relative flex flex-col items-center justify-center">
-            {isAbsorbing && (
-              <div className="absolute bottom-32 animate-absorb text-[10px] font-black text-white bg-black/80 backdrop-blur-md px-6 py-3 border border-white z-50 rounded-sm">
-                ABSORVENDO_PACOTE: {messages[messages.length - 1].text.substring(0, 15)}...
-              </div>
-            )}
-
-            <div className="relative scale-[1.8]">
-              {/* Brilho de fundo */}
-              <div className="absolute inset-0 bg-cyan-500/10 blur-[90px] rounded-full scale-150 animate-pulse"></div>
-              
-              {/* Geometria Quântica */}
-              <div className="relative w-48 h-48 border-[1px] border-white/10 rounded-full animate-[spin_30s_linear_infinite]">
-                 <div className="absolute inset-4 border-[1px] border-cyan-500/20 rounded-[40%_60%_70%_30%_/_40%_40%_60%_60%] animate-[spin_12s_linear_infinite_reverse]"></div>
-                 <div className="absolute inset-8 border-[0.5px] border-white/5 rounded-[60%_40%_30%_70%_/_60%_30%_70%_40%] animate-[spin_8s_linear_infinite]"></div>
-                 
-                 {/* Qubit Central */}
-                 <div className="absolute inset-10 bg-white rounded-full blur-[0.5px] shadow-[0_0_60px_white] flex items-center justify-center transition-transform duration-75"
-                      style={{ transform: `scale(${pulse})` }}>
-                    <span className="text-black text-2xl font-black italic tracking-tighter">ℜ</span>
-                 </div>
-              </div>
-            </div>
-            
-            <div className="absolute bottom-10 text-[9px] text-white/20 tracking-[1em] uppercase">Concentração de Entropia Ativa</div>
+          <div className="flex flex-col">
+            <span className="text-[10px] opacity-40 uppercase">System Status</span>
+            <span className={`text-sm font-bold ${isCritical ? 'text-red-500 animate-pulse' : 'text-amber-500'}`}>
+              {stats.status}
+            </span>
           </div>
-
-          {/* PAINEL DIREITO: TERMINAL DE RESPOSTAS */}
-          <div className="col-span-3 bg-black/80 p-6 flex flex-col border-l border-white/5 backdrop-blur-md">
-            <div className="flex-grow overflow-y-auto space-y-4 mb-6 pr-2 scrollbar-thin scrollbar-thumb-gray-800">
-              {messages.map((m, i) => (
-                <div key={i} className={`flex flex-col ${m.type === 'user' ? 'items-end' : 'items-start'}`}>
-                  <span className="text-[8px] text-gray-600 mb-1 uppercase tracking-tighter">
-                    {m.type === 'user' ? 'OPERADOR_R_INPUT' : 'CHIP_R_RESPONSE'}
-                  </span>
-                  <div className={`p-4 text-[11px] leading-relaxed shadow-lg ${
-                    m.type === 'user' 
-                    ? 'bg-white text-black font-black border-l-4 border-cyan-500' 
-                    : 'bg-[#080808] border border-cyan-900/50 text-cyan-400 font-medium'
-                  }`}>
-                    {m.text}
-                  </div>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* INPUT DE COMANDO */}
-            <form onSubmit={handleSendMessage} className="relative group">
-              <div className="absolute -top-6 left-0 text-[8px] text-cyan-700 font-bold group-focus-within:text-cyan-400 transition-colors uppercase">Linha de Comando_</div>
-              <input 
-                type="text" 
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="DIGITE UM COMANDO PARA O CHIP..."
-                className="w-full bg-[#0a0a0a] border-b-2 border-cyan-900 p-4 text-[11px] text-white focus:outline-none focus:border-white transition-all placeholder:text-gray-800"
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] text-cyan-900 font-black">v.LINK</div>
-            </form>
-          </div>
-
         </div>
       </div>
 
-      {/* ANIMAÇÕES CUSTOMIZADAS */}
-      <style jsx>{`
-        @keyframes absorb {
-          0% { transform: translateY(0) scale(1) rotate(0); opacity: 1; filter: blur(0px); }
-          50% { opacity: 1; filter: blur(2px); }
-          100% { transform: translateY(-450px) scale(0) rotate(1080deg); opacity: 0; filter: blur(20px); }
-        }
-        .animate-absorb { animation: absorb 0.9s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards; }
-      `}</style>
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {/* PAINEL PRINCIPAL: ESTADO X */}
+        <div className="md:col-span-2 space-y-6">
+          <div className="bg-zinc-950 border border-amber-900/20 p-8 rounded-3xl relative overflow-hidden">
+            <div className="relative z-10">
+              <span className="text-[12px] opacity-40 flex items-center gap-2 mb-4">
+                <Activity size={12} /> WAVEFUNCTION AMPLITUDE (X)
+              </span>
+              <h2 className="text-7xl font-bold tracking-tighter text-white">
+                {stats.x.toFixed(6)}
+              </h2>
+              <div className="mt-8 h-[100px] flex items-end gap-1">
+                {/* Mini Gráfico de Barras */}
+                {Array.from({ length: 40 }).map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ height: `${Math.abs(stats.x * 50) + Math.random() * 20}%` }}
+                    className="flex-1 bg-amber-600/20 rounded-t-sm"
+                  />
+                ))}
+              </div>
+            </div>
+            {/* Efeito de Scanline */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,118,0.06))] bg-[length:100%_2px,3px_100%] pointer-events-none" />
+          </div>
+
+          {/* GRID DE INFORMAÇÕES SECUNDÁRIAS */}
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-zinc-950 border border-amber-900/10 p-6 rounded-2xl">
+              <p className="text-[10px] opacity-40 mb-2 uppercase">Entropia (Fext)</p>
+              <p className="text-2xl font-bold text-amber-200">{stats.fext.toFixed(4)}</p>
+            </div>
+            <div className="bg-zinc-950 border border-amber-900/10 p-6 rounded-2xl">
+              <p className="text-[10px] opacity-40 mb-2 uppercase">Hadamard Prob.</p>
+              <p className="text-2xl font-bold text-amber-200">{(stats.hadamard * 100).toFixed(2)}%</p>
+            </div>
+          </div>
+        </div>
+
+        {/* BARRA LATERAL: ESTABILIDADE E COERÊNCIA */}
+        <div className="space-y-6">
+          <div className={`p-8 rounded-3xl border transition-all duration-500 ${isCritical ? 'bg-red-950/20 border-red-500' : 'bg-zinc-950 border-amber-900/20'}`}>
+            <div className="flex justify-between items-center mb-6">
+              <span className="text-[12px] font-bold">ESTABILIDADE Ξ</span>
+              <ShieldAlert size={18} className={isCritical ? 'text-red-500' : 'text-amber-500'} />
+            </div>
+            
+            <div className="relative h-4 w-full bg-zinc-900 rounded-full overflow-hidden mb-4">
+              <motion.div 
+                animate={{ width: `${stats.stability * 100}%` }}
+                className={`h-full ${isCritical ? 'bg-red-600' : 'bg-amber-500'}`}
+              />
+            </div>
+            <p className="text-xs opacity-50 leading-relaxed">
+              {isCritical 
+                ? "ALERTA: Decoerência quântica detectada. Aproxime o hardware para recalibragem." 
+                : "Sistema em equilíbrio termodinâmico. Fluxo de dados estável."}
+            </p>
+          </div>
+
+          <div className="bg-zinc-950 border border-amber-900/10 p-8 rounded-3xl">
+            <h4 className="text-[10px] opacity-40 mb-6 tracking-widest uppercase">Processador de Entropia</h4>
+            <div className="grid grid-cols-4 gap-2">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <motion.div 
+                  key={i}
+                  animate={{ opacity: [0.2, 1, 0.2] }}
+                  transition={{ duration: Math.random() * 2, repeat: Infinity }}
+                  className="h-2 w-full bg-amber-900/30 rounded-full"
+                />
+              ))}
+            </div>
+            <button className="w-full mt-8 py-3 border border-amber-500/20 rounded-xl text-[10px] hover:bg-amber-500 hover:text-black transition-all font-bold">
+              RECALIBRAR NÚCLEO
+            </button>
+          </div>
+        </div>
+
+      </div>
     </main>
   );
 }
