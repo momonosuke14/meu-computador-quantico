@@ -33,5 +33,5 @@ export async function POST(req: Request) {
   });
 
   // Retorna a resposta em tempo real (Streaming) para o seu site
-  return result.toDataStreamResponse();
+  return result.toAIStreamResponse();
 }
